@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CameraView</title>
+    <style>
+        .cameraViewContainer, .movable {
+            border: 1px solid black;
+        }
+        .cameraViewContainer {
+            position: relative;
+            width: 400px;
+            height: 300px;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+        }
+        .cameraViewContent {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            will-change: transform;
+            }
+            .movable {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+            }
+    </style>
+</head>
+<body>
+    <div class="cameraViewContainer">
+        <div class="cameraViewContent">
+                <div class="movable" X="30" Y="40"></div>
+                <div class="movable" X="120" Y="100"></div>
+                <div class="movable" X="60" Y="160"></div>
+                <div class="movable" X="200" Y="60"></div>
+        </div>
+    </div>
+    <div class="cameraViewContainer">
+        <div class="cameraViewContent">
+            <div class="movable" X="200" Y="60"></div>
+            <div class="movable" X="300" Y="180"></div>
+            <div class="movable" X="50" Y="220"></div>
+            <div class="movable" X="100" Y="50"></div>
+            <div class="movable" X="180" Y="120"></div>
+            <div class="movable" X="250" Y="90"></div>
+            <div class="movable" X="320" Y="40"></div>
+            <div class="movable" X="60" Y="160"></div>
+            <div class="movable" X="350" Y="250"></div>
+            <div class="movable" X="120" Y="200"></div>
+            <div class="movable" X="200" Y="260"></div>
+            <div class="movable"></div>
+            <div class="movable"></div>
+            <div class="movable"></div>
+        </div>
+    </div>
+</body>
+<script>
+    function enableCameraView(containerClass, elementClass) {
+        document.querySelectorAll('.' + containerClass).forEach(function(container) {
+            let cameraX = 0;
+            let cameraY = 0;
+            let scale = 1;
+            let isPanning = false;
+            let startMouse = {x: 0, y: 0};
+            let startCamera = {x: 0, y: 0};
+
+        function updateMovablePositions() {
+            const content = container.querySelector('.cameraViewContent');
+            content.style.transform = `translate(${-cameraX * scale}px, ${-cameraY * scale}px) scale(${scale})`;
+            content.style.transformOrigin = 'top left';
+
+            // Find the bottommost and rightmost positions
+            let maxBottom = 0;
+            let maxRight = 0;
+            let boxWidth = 50, boxHeight = 50;
+            content.querySelectorAll('.' + elementClass).forEach(function(el) {
+                const x = parseInt(el.getAttribute('X'), 10);
+                const y = parseInt(el.getAttribute('Y'), 10);
+                if (!isNaN(x) && !isNaN(y)) {
+                    if (y + boxHeight > maxBottom) maxBottom = y + boxHeight;
+                    if (x + boxWidth > maxRight) maxRight = x + boxWidth;
+                }
+            });
+
+            content.querySelectorAll('.' + elementClass).forEach(function(el) {
+                    let x = parseInt(el.getAttribute('X'), 10);
+                    let y = parseInt(el.getAttribute('Y'), 10);
+                    if (!updateMovablePositions._autoPos) updateMovablePositions._autoPos = {x: maxRight, y: maxBottom};
+                    if (isNaN(x) || isNaN(y)) {
+                        // Place at bottom of the last auto-placed element, offset each time
+                        x = updateMovablePositions._autoPos.x;
+                        y = updateMovablePositions._autoPos.y;
+                        updateMovablePositions._autoPos.y += boxHeight + 10; // 10px gap below
+                    }
+                    el.style.left = x + 'px';
+                    el.style.top = y + 'px';
+                    el.style.transform = '';
+                });
+                // Reset for next call
+                delete updateMovablePositions._autoPos;
+        }
+            container.addEventListener('mousedown', function(e) {
+                isPanning = true;
+                startMouse.x = e.clientX;
+                startMouse.y = e.clientY;
+                startCamera.x = cameraX;
+                startCamera.y = cameraY;
+                container.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isPanning) return;
+                const dx = (e.clientX - startMouse.x) / scale;
+                const dy = (e.clientY - startMouse.y) / scale;
+                cameraX = startCamera.x - dx;
+                cameraY = startCamera.y - dy;
+                updateMovablePositions();
+            });
+
+            document.addEventListener('mouseup', function() {
+                isPanning = false;
+                container.style.cursor = 'grab';
+            });
+
+            container.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                isPanning = true;
+                startMouse.x = e.touches[0].clientX;
+                startMouse.y = e.touches[0].clientY;
+                startCamera.x = cameraX;
+                startCamera.y = cameraY;
+            });
+            document.addEventListener('touchmove', function(e) {
+                if (!isPanning || e.touches.length !== 1) return;
+                const dx = (e.touches[0].clientX - startMouse.x) / scale;
+                const dy = (e.touches[0].clientY - startMouse.y) / scale;
+                cameraX = startCamera.x - dx;
+                cameraY = startCamera.y - dy;
+                updateMovablePositions();
+            });
+            document.addEventListener('touchend', function() {
+                isPanning = false;
+            });
+
+            container.addEventListener('wheel', function(e) {
+                if (e.ctrlKey) {
+                    // Zoom in/out
+                    const zoomIntensity = 0.1;
+                    let newScale = scale * (1 - e.deltaY * zoomIntensity / 100);
+                    newScale = Math.max(0.1, Math.min(newScale, 10));
+                    // Zoom to mouse position
+                    const rect = container.getBoundingClientRect();
+                    const mouseX = (e.clientX - rect.left) / scale + cameraX;
+                    const mouseY = (e.clientY - rect.top) / scale + cameraY;
+                    cameraX = mouseX - (mouseX - cameraX) * (scale / newScale);
+                    cameraY = mouseY - (mouseY - cameraY) * (scale / newScale);
+                    scale = newScale;
+                } else if (e.shiftKey) {
+                    cameraX += (e.deltaY !== 0 ? e.deltaY : e.deltaX) / scale;
+                } else {
+                    cameraY += e.deltaY / scale;
+                    cameraX += e.deltaX / scale;
+                }
+                updateMovablePositions();
+                e.preventDefault();
+            }, { passive: false });
+
+            updateMovablePositions();
+        });
+    }
+
+    enableCameraView('cameraViewContainer', 'movable');
+</script>
+</html>
