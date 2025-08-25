@@ -1,21 +1,3 @@
-// Event hook arrays
-const _transformChangeCallbacks = [];
-const _elementMoveCallbacks = [];
-
-export function onTransformChange(cb) {
-    _transformChangeCallbacks.push(cb);
-}
-export function onElementMove(cb) {
-    _elementMoveCallbacks.push(cb);
-}
-
-function triggerTransformChange(cameraX, cameraY, scale) {
-    _transformChangeCallbacks.forEach(cb => cb(cameraX, cameraY, scale));
-}
-function triggerElementMove(element) {
-    _elementMoveCallbacks.forEach(cb => cb(element));
-}
-
 function enableCameraView(containerClass, contentClass, elementClass) {
     document.querySelectorAll('.' + containerClass).forEach(function(container) {
         Object.assign(container.style, {
@@ -23,14 +5,18 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             overflow: 'hidden',
             userSelect: 'none'
         });
-        let cameraX = 0;
-        let cameraY = 0;
-        let scale = 1;
+    let cameraX = 0;
+    let cameraY = 0;
+    let scale = 1;
+    // Store scale on container for access by dragging logic
+    container._cameraScale = scale;
         let isPanning = false;
         let startMouse = {x: 0, y: 0};
         let startCamera = {x: 0, y: 0};
 
-        function updateMovablePositions() {
+    function updateMovablePositions() {
+    // Listen for custom event to update positions during drag
+    container.addEventListener('updateMovablePositions', updateMovablePositions);
             const content = container.querySelector('.' + contentClass);
             // Enforce mandatory content styles
             Object.assign(content.style, {
@@ -44,8 +30,8 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             content.style.willChange = 'transform';
             content.style.transform = `translate(${-cameraX * scale}px, ${-cameraY * scale}px) scale(${scale})`;
             content.style.transformOrigin = 'top left';
-            // Notify transform change
-            triggerTransformChange(cameraX, cameraY, scale);
+            // Update scale property for dragging logic
+            container._cameraScale = scale;
 
             let maxBottom = 0;
             let maxRight = 0;
@@ -68,6 +54,9 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 if (isNaN(x) || isNaN(y)) {
                     x = autoPos.x;
                     y = autoPos.y;
+                    // Assign X and Y attributes so this only happens once
+                    el.setAttribute('X', x);
+                    el.setAttribute('Y', y);
                     autoPos.y += boxHeight + 10; // 10px gap below
                 }
                 el.style.left = x + 'px';
@@ -200,9 +189,8 @@ let dragState = {
     startY: 0,
     origX: 0,
     origY: 0,
-    pending: false,
-    nextLeft: 0,
-    nextTop: 0
+    scale: 1,
+    container: null
 };
 
 function updateDraggedPosition() {
@@ -225,8 +213,11 @@ function enableElementDragging(draggableClass) {
         dragState.isDragging = true;
         dragState.startX = e.clientX;
         dragState.startY = e.clientY;
-        dragState.origX = parseInt(e.target.style.left, 10) || 0;
-        dragState.origY = parseInt(e.target.style.top, 10) || 0;
+        dragState.origX = parseInt(e.target.getAttribute('X'), 10) || 0;
+        dragState.origY = parseInt(e.target.getAttribute('Y'), 10) || 0;
+        let container = e.target.closest('.cameraViewContainer');
+        dragState.container = container;
+        dragState.scale = container && container._cameraScale ? container._cameraScale : 1;
         e.stopPropagation();
         e.preventDefault();
     });
@@ -238,61 +229,52 @@ function enableElementDragging(draggableClass) {
         dragState.isDragging = true;
         dragState.startX = e.touches[0].clientX;
         dragState.startY = e.touches[0].clientY;
-        dragState.origX = parseInt(target.style.left, 10) || 0;
-        dragState.origY = parseInt(target.style.top, 10) || 0;
+        dragState.origX = parseInt(target.getAttribute('X'), 10) || 0;
+        dragState.origY = parseInt(target.getAttribute('Y'), 10) || 0;
+        let container = target.closest('.cameraViewContainer');
+        dragState.container = container;
+        dragState.scale = container && container._cameraScale ? container._cameraScale : 1;
         e.stopPropagation();
         e.preventDefault();
     }, { passive: false });
 
     document.addEventListener('mousemove', function(e) {
         if (!dragState.isDragging || !dragState.el) return;
-        const dx = e.clientX - dragState.startX;
-        const dy = e.clientY - dragState.startY;
-        dragState.el.style.left = (dragState.origX + dx) + 'px';
-        dragState.el.style.top = (dragState.origY + dy) + 'px';
-        // Real-time update for arrows
-        if (typeof triggerElementMove === 'function') triggerElementMove(dragState.el);
+        const scale = dragState.scale || 1;
+        const dx = (e.clientX - dragState.startX) / scale;
+        const dy = (e.clientY - dragState.startY) / scale;
+        let newX = dragState.origX + dx;
+        let newY = dragState.origY + dy;
+        dragState.el.setAttribute('X', Math.round(newX));
+        dragState.el.setAttribute('Y', Math.round(newY));
+        // Always update via custom event for the correct container
+        if (dragState.container) {
+            dragState.container.dispatchEvent(new CustomEvent('updateMovablePositions'));
+        }
     });
     document.addEventListener('mouseup', function(e) {
-        if (dragState.isDragging && dragState.el) {
-            // Update X and Y attributes on drag end
-            const parentRect = dragState.el.parentElement.getBoundingClientRect();
-            const elRect = dragState.el.getBoundingClientRect();
-            const newX = Math.round(elRect.left - parentRect.left);
-            const newY = Math.round(elRect.top - parentRect.top);
-            dragState.el.setAttribute('X', newX);
-            dragState.el.setAttribute('Y', newY);
-        }
         dragState.isDragging = false;
         dragState.el = null;
+        dragState.container = null;
     });
     document.addEventListener('touchmove', function(e) {
         if (!dragState.isDragging || !dragState.el || e.touches.length !== 1) return;
-        const dx = e.touches[0].clientX - dragState.startX;
-        const dy = e.touches[0].clientY - dragState.startY;
-        dragState.nextLeft = dragState.origX + dx;
-        dragState.nextTop = dragState.origY + dy;
-        if (!dragState.pending) {
-            dragState.pending = true;
-            requestAnimationFrame(updateDraggedPosition);
+        const scale = dragState.scale || 1;
+        const dx = (e.touches[0].clientX - dragState.startX) / scale;
+        const dy = (e.touches[0].clientY - dragState.startY) / scale;
+        let newX = dragState.origX + dx;
+        let newY = dragState.origY + dy;
+        dragState.el.setAttribute('X', Math.round(newX));
+        dragState.el.setAttribute('Y', Math.round(newY));
+        if (dragState.container) {
+            dragState.container.dispatchEvent(new CustomEvent('updateMovablePositions'));
         }
-        // Real-time update for arrows
-        if (typeof triggerElementMove === 'function') triggerElementMove(dragState.el);
         e.preventDefault();
     }, { passive: false });
     document.addEventListener('touchend', function(e) {
-        if (dragState.isDragging && dragState.el) {
-            // Update X and Y attributes on drag end
-            const parentRect = dragState.el.parentElement.getBoundingClientRect();
-            const elRect = dragState.el.getBoundingClientRect();
-            const newX = Math.round(elRect.left - parentRect.left);
-            const newY = Math.round(elRect.top - parentRect.top);
-            dragState.el.setAttribute('X', newX);
-            dragState.el.setAttribute('Y', newY);
-            triggerElementMove(dragState.el);
-        }
         dragState.isDragging = false;
         dragState.el = null;
+        dragState.container = null;
     });
 }
 
