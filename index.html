@@ -32,6 +32,14 @@
 </head>
 <body>
     <div class="cameraViewContainer">
+        <svg class="arrowOverlay">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" />
+                </marker>
+            </defs>
+            <line id="arrow1" x1="40" y1="50" x2="130" y2="110" stroke="black" stroke-width="2" marker-end="url(#arrowhead)" />
+        </svg>
         <div class="cameraViewContent">
             <div class="movable" id="el1" X="30" Y="40"></div>
             <div class="movable" id="el2" X="120" Y="100"></div>
