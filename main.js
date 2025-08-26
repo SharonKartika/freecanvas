@@ -5,7 +5,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             overflow: 'hidden',
             userSelect: 'none'
         });
-    let cameraX = 0;
+    let cameraX = 0;    
     let cameraY = 0;
     let scale = 1;
     // Store scale on container for access by dragging logic
