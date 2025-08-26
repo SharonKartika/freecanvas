@@ -89,70 +89,80 @@ function enableCameraView(containerClass, contentClass, elementClass) {
 
         let pinchStartDist = null;
         let pinchStartScale = null;
+        let pinchStartMid = null;
         container.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1 && e.target.classList.contains(elementClass)) return; // Prevent camera pan if dragging element
             if (e.touches.length === 2) {
-                // Reset on first touch of second finger
-                pinchStartDist = null;
-                pinchStartScale = null;
-            }
-            isPanning = true;
-            startMouse.x = e.touches[0].clientX;
-            startMouse.y = e.touches[0].clientY;
-            startCamera.x = cameraX;
-            startCamera.y = cameraY;
-            container.style.cursor = 'grabbing';
-            e.preventDefault(); // Prevent page scroll on touch start
-        }, { passive: false });
-        document.addEventListener('touchmove', function(e) {
-            if (!isPanning) return;
-            if (e.touches.length === 2) {
+                // Pinch start
                 const rect = container.getBoundingClientRect();
                 const x0 = e.touches[0].clientX;
                 const y0 = e.touches[0].clientY;
                 const x1 = e.touches[1].clientX;
                 const y1 = e.touches[1].clientY;
-                const in0 = x0 >= rect.left && x0 <= rect.right && y0 >= rect.top && y0 <= rect.bottom;
-                const in1 = x1 >= rect.left && x1 <= rect.right && y1 >= rect.top && y1 <= rect.bottom;
-                if (!(in0 && in1)) {
-                    return;
-                }
+                const dx = x0 - x1;
+                const dy = y0 - y1;
+                pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+                pinchStartScale = scale;
+                const midX = (x0 + x1) / 2;
+                const midY = (y0 + y1) / 2;
+                pinchStartMid = {
+                    x: (midX - rect.left) / scale + cameraX,
+                    y: (midY - rect.top) / scale + cameraY
+                };
+                isPanning = false;
+            } else if (e.touches.length === 1) {
+                isPanning = true;
+                startMouse.x = e.touches[0].clientX;
+                startMouse.y = e.touches[0].clientY;
+                startCamera.x = cameraX;
+                startCamera.y = cameraY;
+                container.style.cursor = 'grabbing';
+            }
+            e.preventDefault(); // Prevent page scroll on touch start
+        }, { passive: false });
+
+        container.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && pinchStartDist !== null) {
+                // Pinch to zoom
+                const rect = container.getBoundingClientRect();
+                const x0 = e.touches[0].clientX;
+                const y0 = e.touches[0].clientY;
+                const x1 = e.touches[1].clientX;
+                const y1 = e.touches[1].clientY;
                 const dx = x0 - x1;
                 const dy = y0 - y1;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 const midX = (x0 + x1) / 2;
                 const midY = (y0 + y1) / 2;
-                if (pinchStartDist === null) {
-                    pinchStartDist = dist;
-                    pinchStartScale = scale;
-                    pinchStartMid = {
-                        x: (midX - rect.left) / scale + cameraX,
-                        y: (midY - rect.top) / scale + cameraY
-                    };
-                } else {
-                    const newScale = pinchStartScale * (dist / pinchStartDist);
-                    const clampedScale = Math.max(0.1, Math.min(newScale, 10));
-                    cameraX = pinchStartMid.x - (midX - rect.left) / clampedScale;
-                    cameraY = pinchStartMid.y - (midY - rect.top) / clampedScale;
-                    scale = clampedScale;
-                }
-            } else {
+                let newScale = pinchStartScale * (dist / pinchStartDist);
+                newScale = Math.max(0.1, Math.min(newScale, 10));
+                cameraX = pinchStartMid.x - (midX - rect.left) / newScale;
+                cameraY = pinchStartMid.y - (midY - rect.top) / newScale;
+                scale = newScale;
+                updateMovablePositions();
+                e.preventDefault();
+            } else if (e.touches.length === 1 && isPanning) {
+                // One finger pan
                 const dx = (e.touches[0].clientX - startMouse.x) / scale;
                 const dy = (e.touches[0].clientY - startMouse.y) / scale;
                 cameraX = startCamera.x - dx;
                 cameraY = startCamera.y - dy;
+                updateMovablePositions();
+                e.preventDefault();
             }
-            updateMovablePositions();
-            e.preventDefault(); // Prevent page scroll on touch move
         }, { passive: false });
-        document.addEventListener('touchend', function(e) {
-            isPanning = false;
+
+        container.addEventListener('touchend', function(e) {
             if (e.touches.length < 2) {
                 pinchStartDist = null;
                 pinchStartScale = null;
                 pinchStartMid = null;
             }
-            e.preventDefault(); // Prevent page scroll on touch end
+            if (e.touches.length === 0) {
+                isPanning = false;
+                container.style.cursor = 'grab';
+            }
+            e.preventDefault();
         });
 
         container.addEventListener('wheel', function(e) {

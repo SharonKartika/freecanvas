@@ -1,0 +1,1 @@
+Stopped at implmeneting pinch to zoom on touchscreen.
