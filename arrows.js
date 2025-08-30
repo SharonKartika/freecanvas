@@ -62,6 +62,7 @@ function setupArrowUpdates() {
     }
 }
 
-// Automatically set up and draw arrows on load
-setupArrowUpdates();
-updateArrows();
+
+// Expose to window for dynamic usage
+window.setupArrowUpdates = setupArrowUpdates;
+window.updateArrows = updateArrows;
