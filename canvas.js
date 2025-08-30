@@ -5,11 +5,22 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             overflow: 'hidden',
             userSelect: 'none'
         });
-    let cameraX = 0;    
-    let cameraY = 0;
-    let scale = 1;
-    // Store scale on container for access by dragging logic
-    container._cameraScale = scale;
+        let cameraX = 0;    
+        let cameraY = 0;
+        let scale = 1;
+        // Store scale on container for access by dragging logic
+        container._cameraScale = scale;
+
+        // Expose setCameraView method for restoring camera state
+        container.setCameraView = function(x, y, s) {
+            cameraX = typeof x === 'number' ? x : cameraX;
+            cameraY = typeof y === 'number' ? y : cameraY;
+            scale = typeof s === 'number' ? s : scale;
+            updateMovablePositions();
+            container.dispatchEvent(new CustomEvent('cameraViewChanged', {
+                detail: { x: cameraX, y: cameraY, scale }
+            }));
+        };
         let isPanning = false;
         let startMouse = {x: 0, y: 0};
         let startCamera = {x: 0, y: 0};
@@ -80,6 +91,9 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             cameraX = startCamera.x - dx;
             cameraY = startCamera.y - dy;
             updateMovablePositions();
+            container.dispatchEvent(new CustomEvent('cameraViewChanged', {
+                detail: { x: cameraX, y: cameraY, scale }
+            }));
         });
 
         document.addEventListener('mouseup', function() {
@@ -166,6 +180,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
         });
 
         container.addEventListener('wheel', function(e) {
+            let changed = false;
             if (e.ctrlKey) {
                 // Zoom in/out
                 const zoomIntensity = 0.6;
@@ -178,13 +193,21 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 cameraX = mouseX - (mouseX - cameraX) * (scale / newScale);
                 cameraY = mouseY - (mouseY - cameraY) * (scale / newScale);
                 scale = newScale;
+                changed = true;
             } else if (e.shiftKey) {
                 cameraX += (e.deltaY !== 0 ? e.deltaY : e.deltaX) / scale;
+                changed = true;
             } else {
                 cameraY += e.deltaY / scale;
                 cameraX += e.deltaX / scale;
+                changed = true;
             }
             updateMovablePositions();
+            if (changed) {
+                container.dispatchEvent(new CustomEvent('cameraViewChanged', {
+                    detail: { x: cameraX, y: cameraY, scale }
+                }));
+            }
             e.preventDefault();
         }, { passive: false });
 
