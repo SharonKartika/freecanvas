@@ -18,9 +18,6 @@ function createCameraViewContainer(movables) {
     return container;
 }
 
-
-
-
 const STORAGE_KEY = 'freecanvas_state';
 
 function getDefaultState() {

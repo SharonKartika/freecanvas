@@ -44,12 +44,28 @@ function updateArrows() {
     const p1 = getCenter(firstElement);
     const p2 = getCenter(secondElement);
 
-    // Draw a line between the two centers
+    // Calculate bounding box for the SVG overlay
+    const minX = Math.min(p1.x, p2.x) - 20;
+    const minY = Math.min(p1.y, p2.y) - 20;
+    const maxX = Math.max(p1.x, p2.x) + 20;
+    const maxY = Math.max(p1.y, p2.y) + 20;
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    // Position and size the SVG overlay to cover both points
+    svg.style.left = `${minX}px`;
+    svg.style.top = `${minY}px`;
+    svg.style.width = `${width}px`;
+    svg.style.height = `${height}px`;
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+
+    // Draw a line between the two centers, relative to the SVG's origin
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', p1.x);
-    line.setAttribute('y1', p1.y);
-    line.setAttribute('x2', p2.x);
-    line.setAttribute('y2', p2.y);
+    line.setAttribute('x1', p1.x - minX);
+    line.setAttribute('y1', p1.y - minY);
+    line.setAttribute('x2', p2.x - minX);
+    line.setAttribute('y2', p2.y - minY);
     line.setAttribute('stroke', 'black');
     line.setAttribute('stroke-width', '2');
     svg.appendChild(line);
@@ -61,7 +77,6 @@ function setupArrowUpdates() {
         containers[1].addEventListener('updateMovablePositions', updateArrows);
     }
 }
-
 
 // Expose to window for dynamic usage
 window.setupArrowUpdates = setupArrowUpdates;
