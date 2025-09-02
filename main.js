@@ -2,7 +2,7 @@
 function createMovable({ id, x, y }) {
     const div = document.createElement('div');
     div.classList.add('movable');
-    if (id) div.id = id;
+        if (id !== undefined) div.id = id;
     if (typeof x === 'number') div.setAttribute('X', x);
     if (typeof y === 'number') div.setAttribute('Y', y);
     return div;
@@ -18,31 +18,40 @@ function createCameraViewContainer(movables) {
     return container;
 }
 
+
 const STORAGE_KEY = 'freecanvas_state';
+// Clear localStorage for this key so new default IDs are loaded
+// localStorage.removeItem(STORAGE_KEY);
 
 function getDefaultState() {
+    // Assign IDs unique only within each container
+    function makeMovables(arr) {
+        return arr.map((xy, idx) => ({ id: idx + 1, x: xy[0], y: xy[1] }));
+    }
     return {
         containers: [
-            [
-                { id: 'el1', x: 30, y: 40 },
-                { id: 'el2', x: 120, y: 100 },
-                { x: 60, y: 160 },
-                { x: 200, y: 60 }
-            ],
-            [
-                { x: 200, y: 60 },
-                { x: 300, y: 180 },
-                { x: 50, y: 220 },
-                { x: 100, y: 50 },
-                { x: 180, y: 120 },
-                { x: 250, y: 90 },
-                { x: 320, y: 40 },
-                { x: 60, y: 160 },
-                { x: 350, y: 250 },
-                { x: 120, y: 200 },
-                { x: 200, y: 260 },
-                {}, {}, {}
-            ]
+            makeMovables([
+                [30, 40],
+                [120, 100],
+                [60, 160],
+                [200, 60]
+            ]),
+            makeMovables([
+                [200, 60],
+                [300, 180],
+                [50, 220],
+                [100, 50],
+                [180, 120],
+                [250, 90],
+                [320, 40],
+                [60, 160],
+                [350, 250],
+                [120, 200],
+                [200, 260],
+                [undefined, undefined],
+                [undefined, undefined],
+                [undefined, undefined]
+            ])
         ],
         cameras: [
             { x: 0, y: 0, scale: 1 },
@@ -88,14 +97,15 @@ window.addEventListener('DOMContentLoaded', () => {
             saveState(state);
         });
         // Listen for updateMovablePositions to save positions
-        container.addEventListener('updateMovablePositions', () => {
-            state.containers[i] = Array.from(container.querySelectorAll('.movable')).map(el => ({
-                id: el.id || undefined,
-                x: parseInt(el.getAttribute('X'), 10) || 0,
-                y: parseInt(el.getAttribute('Y'), 10) || 0
-            }));
-            saveState(state);
-        });
+            container.addEventListener('updateMovablePositions', () => {
+                state.containers[i] = Array.from(container.querySelectorAll('.movable')).map(el => ({
+                    // Always save the integer ID
+                    id: el.id ? (isNaN(Number(el.id)) ? el.id : Number(el.id)) : undefined,
+                    x: parseInt(el.getAttribute('X'), 10) || 0,
+                    y: parseInt(el.getAttribute('Y'), 10) || 0
+                }));
+                saveState(state);
+            });
         // Restore camera state if available
         const cam = state.cameras[i];
         if (cam && window.enableCameraView && container.querySelector('.cameraViewContent')) {
@@ -107,6 +117,26 @@ window.addEventListener('DOMContentLoaded', () => {
                 // For now, just fire the event for future compatibility
                 container.dispatchEvent(new CustomEvent('setCameraView', { detail: cam }));
             }
+        }
+        // Draw and update arrow between two movables by ID in the second container
+        if (i === 1 && window.ArrowLib) {
+            // Specify the IDs to connect
+            const ARROW_FROM_ID = 1;
+            const ARROW_TO_ID = 2;
+            const drawArrow = () => {
+                const movables = container.querySelectorAll('.movable');
+                const el1 = Array.from(movables).find(el => Number(el.id) === ARROW_FROM_ID);
+                const el2 = Array.from(movables).find(el => Number(el.id) === ARROW_TO_ID);
+                if (el1 && el2) {
+                    el1.style.background = 'lightgreen';
+                    el2.style.background = 'lightcoral';
+                    const content = container.querySelector('.cameraViewContent');
+                    const svg = window.ArrowLib.createOrGetArrowOverlay(content);
+                    window.ArrowLib.drawArrowBetweenElements(svg, el1, el2);
+                }
+            };
+            drawArrow();
+            container.addEventListener('updateMovablePositions', drawArrow);
         }
     });
 });
