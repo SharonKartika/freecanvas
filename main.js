@@ -28,35 +28,43 @@ function getDefaultState() {
     function makeMovables(arr) {
         return arr.map((xy, idx) => ({ id: idx + 1, x: xy[0], y: xy[1] }));
     }
+    const containers = [
+        makeMovables([
+            [30, 40],
+            [120, 100],
+            [60, 160],
+            [200, 60]
+        ]),
+        makeMovables([
+            [200, 60],
+            [300, 180],
+            [50, 220],
+            [100, 50],
+            [180, 120],
+            [250, 90],
+            [320, 40],
+            [60, 160],
+            [350, 250],
+            [120, 200],
+            [200, 260],
+            [undefined, undefined],
+            [undefined, undefined],
+            [undefined, undefined]
+        ])
+    ];
+    // Default: connect about half the elements sequentially (1->2, 2->3, ... up to n/2)
+    const defaultConnections = [];
+    const half = Math.floor(containers[1].length / 2);
+    for (let i = 1; i < 1 + half; i++) {
+        defaultConnections.push([i, i + 1]);
+    }
     return {
-        containers: [
-            makeMovables([
-                [30, 40],
-                [120, 100],
-                [60, 160],
-                [200, 60]
-            ]),
-            makeMovables([
-                [200, 60],
-                [300, 180],
-                [50, 220],
-                [100, 50],
-                [180, 120],
-                [250, 90],
-                [320, 40],
-                [60, 160],
-                [350, 250],
-                [120, 200],
-                [200, 260],
-                [undefined, undefined],
-                [undefined, undefined],
-                [undefined, undefined]
-            ])
-        ],
+        containers,
         cameras: [
             { x: 0, y: 0, scale: 1 },
             { x: 0, y: 0, scale: 1 }
-        ]
+        ],
+        connections: [[], defaultConnections] // one per container
     };
 }
 
@@ -118,25 +126,30 @@ window.addEventListener('DOMContentLoaded', () => {
                 container.dispatchEvent(new CustomEvent('setCameraView', { detail: cam }));
             }
         }
-        // Draw and update arrow between two movables by ID in the second container
+        // Draw and update arrows for stored connections in the second container
         if (i === 1 && window.ArrowLib) {
-            // Specify the IDs to connect
-            const ARROW_FROM_ID = 1;
-            const ARROW_TO_ID = 2;
-            const drawArrow = () => {
-                const movables = container.querySelectorAll('.movable');
-                const el1 = Array.from(movables).find(el => Number(el.id) === ARROW_FROM_ID);
-                const el2 = Array.from(movables).find(el => Number(el.id) === ARROW_TO_ID);
-                if (el1 && el2) {
-                    el1.style.background = 'lightgreen';
-                    el2.style.background = 'lightcoral';
-                    const content = container.querySelector('.cameraViewContent');
-                    const svg = window.ArrowLib.createOrGetArrowOverlay(content);
-                    window.ArrowLib.drawArrowBetweenElements(svg, el1, el2);
-                }
+            const drawArrows = () => {
+                const movables = Array.from(container.querySelectorAll('.movable'));
+                if (movables.length < 2) return;
+                // Reset backgrounds
+                movables.forEach(el => el.style.background = '');
+                // Color all movables for visibility
+                const colors = ['lightgreen', 'lightcoral', 'lightblue', 'khaki', 'plum', 'orange', 'lightpink', 'lightgray'];
+                movables.forEach((el, idx) => el.style.background = colors[idx % colors.length]);
+                const content = container.querySelector('.cameraViewContent');
+                const svg = window.ArrowLib.createOrGetArrowOverlay(content);
+                // Get connections from state (by ID)
+                const connections = (state.connections && state.connections[1]) ? state.connections[1] : [];
+                // Map IDs to elements
+                const idToEl = {};
+                movables.forEach(el => { idToEl[Number(el.id)] = el; });
+                const edgePairs = connections
+                    .map(([fromId, toId]) => [idToEl[fromId], idToEl[toId]])
+                    .filter(([from, to]) => from && to);
+                window.ArrowLib.drawArrowsForConnections(svg, edgePairs);
             };
-            drawArrow();
-            container.addEventListener('updateMovablePositions', drawArrow);
+            drawArrows();
+            container.addEventListener('updateMovablePositions', drawArrows);
         }
     });
 });

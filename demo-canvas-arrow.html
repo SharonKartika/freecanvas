@@ -33,17 +33,41 @@
 <body>
     <div class="cameraViewContainer">
         <div class="cameraViewContent">
-            <div class="movable" X="30" Y="40" style="left:30px;top:40px;"></div>
-            <div class="movable" X="120" Y="100" style="left:120px;top:100px;"></div>
-            <div class="movable" X="60" Y="160" style="left:60px;top:160px;"></div>
-            <div class="movable" X="200" Y="60" style="left:200px;top:60px;"></div>
+            <div class="movable" id="1" X="30" Y="40" style="left:30px;top:40px;"></div>
+            <div class="movable" id="2" X="120" Y="100" style="left:120px;top:100px;"></div>
+            <div class="movable" id="3" X="60" Y="160" style="left:60px;top:160px;"></div>
+            <div class="movable" id="4" X="200" Y="60" style="left:200px;top:60px;"></div>
         </div>
     </div>
+        <script src="./arrows.js"></script>
         <script type="module" src="./canvas.js"></script>
         <script>
             window.addEventListener('DOMContentLoaded', function() {
-                if (window.enableCameraView) window.enableCameraView('cameraViewContainer', 'cameraViewContent', 'movable');
-                if (window.enableElementDragging) window.enableElementDragging('movable');
+                window.enableCameraView('cameraViewContainer', 'cameraViewContent', 'movable');
+                window.enableElementDragging('movable');
+
+                const content = document.querySelector('.cameraViewContent');
+                const connections = [
+                    [1, 2],
+                    [1, 3],
+                    [2, 3],
+                    [4, 1]
+                ];
+                function drawDemoArrows() {
+                    if (window.ArrowLib) {
+                        const svg = window.ArrowLib.createOrGetArrowOverlay(content);
+                        const idToEl = {};
+                        content.querySelectorAll('.movable').forEach(el => { idToEl[el.id] = el; });
+                        const edgePairs = connections
+                            .map(([from, to]) => [idToEl[from], idToEl[to]])
+                            .filter(([from, to]) => from && to);
+                        window.ArrowLib.drawArrowsForConnections(svg, edgePairs);
+                    }
+                }
+                drawDemoArrows();
+                // Redraw arrows when movables are moved (listen on container)
+                const container = document.querySelector('.cameraViewContainer');
+                container.addEventListener('updateMovablePositions', drawDemoArrows);
             });
         </script>
 </body>
