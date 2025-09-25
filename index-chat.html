@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CameraView</title>
+    <style>
+        .cameraViewContainer, .movable {
+            border: 1px solid black;
+        }
+        .cameraViewContainer {
+            width: 400px;
+            height: 300px;
+            cursor: grab;
+            position: relative;
+        }
+        /* .cameraViewContent {
+        } */
+        .movable {
+            width: 150px;          
+            height: auto;          
+            /* background: #fff; */
+        }
+        .arrowOverlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- CameraViewContainers and movables will be created dynamically by main.js -->
+    <script type="module" src="./index-chat.js"></script>
+    <script type="module" src="./canvas.js"></script>
+    <script type="module" src="./arrows.js"></script>
+</body>
+</html>

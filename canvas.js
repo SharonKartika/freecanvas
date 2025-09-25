@@ -38,7 +38,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 height: '100%'
             });
             // Add will-change: transform for performance
-            content.style.willChange = 'transform';
+            // content.style.willChange = 'transform'; // This line causes blurriness on scale in chrome but not firefox
             content.style.transform = `translate(${-cameraX * scale}px, ${-cameraY * scale}px) scale(${scale})`;
             content.style.transformOrigin = 'top left';
             // Update scale property for dragging logic

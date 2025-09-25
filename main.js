@@ -21,7 +21,7 @@ function createCameraViewContainer(movables) {
 
 const STORAGE_KEY = 'freecanvas_state';
 // Clear localStorage for this key so new default IDs are loaded
-// localStorage.removeItem(STORAGE_KEY);
+localStorage.removeItem(STORAGE_KEY);
 
 function getDefaultState() {
     // Assign IDs unique only within each container

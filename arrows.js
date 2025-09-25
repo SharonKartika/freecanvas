@@ -143,5 +143,5 @@ window.ArrowLib = {
 };
 
 // Expose to window for dynamic usage
-window.setupArrowUpdates = setupArrowUpdates;
-window.updateArrows = updateArrows;
+// window.setupArrowUpdates = setupArrowUpdates;
+// window.updateArrows = updateArrows;
