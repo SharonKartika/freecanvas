@@ -9,6 +9,8 @@ function createMovable({ id, x, y }) {
     const words = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.".split(' ');
     const count = Math.floor(Math.random() * words.length) + 1;
     div.textContent = words.slice(0, count).join(' ');
+    div.textContent = "";
+    div.style.height = `${Math.floor(Math.random() * (200 - 60 + 1)) + 60}px`;
     // >>> START: ADDED (plus-button) - consider refactoring this block later <<<
     const btn = document.createElement('button');
     btn.className = 'movable-plus';
@@ -140,8 +142,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 // Reset backgrounds
                 movables.forEach(el => el.style.background = '');
                 // Color all movables for visibility
-                const colors = ['lightgreen', 'lightcoral', 'lightblue', 'khaki', 'plum', 'orange', 'lightpink', 'lightgray'];
-                movables.forEach((el, idx) => el.style.background = colors[idx % colors.length]);
+                // const colors = ['lightgreen', 'lightcoral', 'lightblue', 'khaki', 'plum', 'orange', 'lightpink', 'lightgray'];
+                // movables.forEach((el, idx) => el.style.background = colors[idx % colors.length]);
                 const content = container.querySelector('.cameraViewContent');
                 const svg = window.ArrowLib.createOrGetArrowOverlay(content);
                 // Get connections from state for the current container (by ID)

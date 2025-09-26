@@ -5,12 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CameraView</title>
     <style>
-        .cameraViewContainer, .movable {
+        /* .cameraViewContainer, .movable {
             border: 1px solid black;
+        } */
+        
+        body {
+            margin: 0; /* To disappear the scrollbars */
+        }
+
+        .movable-plus {
+            background-color: #dfdfdf;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px ;
+        }
+        .movable-plus:hover, .movable-plus:focus {
+            background-color: #b9b9b9;
+        }
+        .movable-plus:active {
+            background-color: #0078d3;
         }
         .cameraViewContainer {
-            width: 400px;
-            height: 300px;
+            width: 100vw;
+            height: 100vh;
+            box-sizing: border-box; /* To disappear the scrollbars */
             cursor: grab;
             position: relative;
         }
@@ -20,6 +39,9 @@
             width: 150px;          
             height: auto;          
             /* background: #fff; */
+            border-radius: 7px;
+            padding: 12px;
+            border: 3px solid black;
         }
         .arrowOverlay {
             position: absolute;
