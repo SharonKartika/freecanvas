@@ -42,6 +42,29 @@
             border-radius: 7px;
             padding: 12px;
             border: 3px solid black;
+            /* position: relative; */ /* Added for the plus button but doesn't seem to be required */
+            /* overflow: visible;  */ /* Added for the plus button but doesn't seem to be required */
+        }
+        .movable-plus {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 6px);
+            z-index: 10;
+            /* Use opacity and pointer-events so we can delay hiding without smoothing */
+            opacity: 0;
+            pointer-events: none;
+            margin: 0;
+            /* Hide after a short delay, but do it instantly (no fade) */
+            transition: opacity 0ms linear 200ms;
+        }
+        /* Show immediately on hover/focus (no delay), enable pointer events */
+        .movable:hover .movable-plus,
+        .movable:focus-within .movable-plus,
+        .movable-plus:focus {
+            opacity: 1;
+            pointer-events: auto;
+            transition-delay: 0ms; /* ensure immediate show */
         }
         .arrowOverlay {
             position: absolute;

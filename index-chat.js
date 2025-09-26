@@ -12,19 +12,28 @@ function createMovable({ id, x, y }) {
     div.textContent = "";
     div.style.height = `${Math.floor(Math.random() * (200 - 60 + 1)) + 60}px`;
     // >>> START: ADDED (plus-button) - consider refactoring this block later <<<
+    // If you ever set `.movable { overflow: hidden }`, the button may get clipped;
+    // if that happens add:
+    //   .movable { overflow: visible; }
     const btn = document.createElement('button');
     btn.className = 'movable-plus';
-    btn.style.display = 'block';
     btn.textContent = '+';
-    btn.style.margin = '2px auto';
+    // Keep the button in the DOM as a child of the movable for event handlers,
+    // but absolutely position it so it appears below the movable element.
+    btn.style.position = 'absolute';
+    btn.style.left = '50%';
+    btn.style.top = '100%';
+    btn.style.transform = 'translate(-50%, 6px)';
+    btn.style.zIndex = '10';
+    btn.style.margin = '0';
     // Start the plus-drag on pointer down, then stop propagation so the movable itself won't start dragging
     btn.addEventListener('mousedown', e => {
-        _plusDrag = { startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, container: e.target.closest('.cameraViewContainer'), source: e.target.closest('.movable') };
+        _plusDrag = { startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, container: e.target.closest('.cameraViewContainer'), source: e.target.closest('.movable'), button: e.target };
         e.stopPropagation();
     });
     btn.addEventListener('touchstart', e => {
         const t = e.touches[0];
-        _plusDrag = { startX: t.clientX, startY: t.clientY, lastX: t.clientX, lastY: t.clientY, container: e.target.closest('.cameraViewContainer'), source: e.target.closest('.movable') };
+        _plusDrag = { startX: t.clientX, startY: t.clientY, lastX: t.clientX, lastY: t.clientY, container: e.target.closest('.cameraViewContainer'), source: e.target.closest('.movable'), button: e.target };
         e.stopPropagation();
     }, { passive: false });
     div.appendChild(btn);
@@ -217,6 +226,8 @@ document.addEventListener('mouseup', () => {
             window.ArrowLib.drawArrowsForConnections(svg, edgePairs);
         }
     }
+    // If the button that started the plus-drag still has focus, remove it so it hides
+    try { if (_plusDrag && _plusDrag.button && typeof _plusDrag.button.blur === 'function') _plusDrag.button.blur(); } catch (e) {}
     _plusDrag = null;
 });
 // >>> END: ADDED (plus-drag + arrows) <<<
