@@ -96,7 +96,7 @@ function drawArrowsForConnections(svg, connections) {
     if (ARROW_STYLE === 'edgeCurve') {
         // Minimum leg length in pixels used to avoid tiny legs that produce
         // visually sharp corners. Tweak to taste.
-        const MIN_LEG = 20;
+        const MIN_LEG = 30;
         const paths = [];
         for (const [fromEl, toEl] of connections) {
             const fromCenter = centerMap.get(fromEl) || getCenter(fromEl);
@@ -131,7 +131,6 @@ function drawArrowsForConnections(svg, connections) {
 
             const verticalOverlap = (fromTop <= toBottom && fromBottom >= toTop);
             const horizontalOverlap = (fromLeft <= toRight && fromRight >= toLeft);
-
             if (verticalOverlap && dx !== 0) {
                 // Instead of a single straight horizontal line, route H -> V -> H
                 // so the connection leaves the source horizontally, travels to a
@@ -269,26 +268,37 @@ function drawArrowsForConnections(svg, connections) {
                 // are very close, we'll render a single cubic. Include the cubic
                 // control points in bbox so they aren't clipped.
                 if (p.points.length === 4) {
+                    const s = p.points[0];
                     const a = p.points[1];
                     const b = p.points[2];
+                    const e = p.points[3];
                     const midDist = Math.hypot(b.x - a.x, b.y - a.y);
                     if (midDist < 2 * MIN_LEG) {
-                        // compute cubic control points aligned with start/end direction
-                        const s = p.points[0];
-                        const e = p.points[3];
-                        if (s.x !== e.x) {
-                            const dir = Math.sign(e.x - s.x) || 1;
+                        // compute cubic control points aligned with the actual
+                        // first/last leg directions (s->a and b->e) so the
+                        // curve leaves/enters elements at right angles
+                        const firstVec = { x: a.x - s.x, y: a.y - s.y };
+                        const lastVec = { x: e.x - b.x, y: e.y - b.y };
+                        let cp1, cp2;
+                        if (Math.abs(firstVec.x) >= Math.abs(firstVec.y)) {
+                            const dir = Math.sign(firstVec.x) || 1;
                             const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
-                            const cp1 = { x: s.x + dir * off, y: s.y };
-                            const cp2 = { x: e.x - dir * off, y: e.y };
-                            xs.push(cp1.x, cp2.x); ys.push(cp1.y, cp2.y);
+                            cp1 = { x: s.x + dir * off, y: s.y };
                         } else {
-                            const dir = Math.sign(e.y - s.y) || 1;
+                            const dir = Math.sign(firstVec.y) || 1;
                             const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
-                            const cp1 = { x: s.x, y: s.y + dir * off };
-                            const cp2 = { x: e.x, y: e.y - dir * off };
-                            xs.push(cp1.x, cp2.x); ys.push(cp1.y, cp2.y);
+                            cp1 = { x: s.x, y: s.y + dir * off };
                         }
+                        if (Math.abs(lastVec.x) >= Math.abs(lastVec.y)) {
+                            const dir = Math.sign(e.x - b.x) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
+                            cp2 = { x: e.x - dir * off, y: e.y };
+                        } else {
+                            const dir = Math.sign(e.y - b.y) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
+                            cp2 = { x: e.x, y: e.y - dir * off };
+                        }
+                        xs.push(cp1.x, cp2.x); ys.push(cp1.y, cp2.y);
                     }
                 }
                 continue;
@@ -370,20 +380,31 @@ function drawArrowsForConnections(svg, connections) {
                     const e = p.points[3];
                     const midDist = Math.hypot(b.x - a.x, b.y - a.y);
                     if (midDist < 2 * MIN_LEG) {
-                        // create cubic control points that pull the curve outward
-                        if (s.x !== e.x) {
-                            const dir = Math.sign(e.x - s.x) || 1;
+                        // create cubic control points that align with the true
+                        // incoming/outgoing leg directions (s->a and b->e) so the
+                        // curve leaves/enters elements at right angles
+                        const firstVec = { x: a.x - s.x, y: a.y - s.y };
+                        const lastVec = { x: e.x - b.x, y: e.y - b.y };
+                        let cp1, cp2;
+                        if (Math.abs(firstVec.x) >= Math.abs(firstVec.y)) {
+                            const dir = Math.sign(firstVec.x) || 1;
                             const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
-                            const cp1 = { x: s.x + dir * off, y: s.y };
-                            const cp2 = { x: e.x - dir * off, y: e.y };
-                            d = `M ${s.x - minX},${s.y - minY} C ${cp1.x - minX},${cp1.y - minY} ${cp2.x - minX},${cp2.y - minY} ${e.x - minX},${e.y - minY}`;
+                            cp1 = { x: s.x + dir * off, y: s.y };
                         } else {
-                            const dir = Math.sign(e.y - s.y) || 1;
+                            const dir = Math.sign(firstVec.y) || 1;
                             const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
-                            const cp1 = { x: s.x, y: s.y + dir * off };
-                            const cp2 = { x: e.x, y: e.y - dir * off };
-                            d = `M ${s.x - minX},${s.y - minY} C ${cp1.x - minX},${cp1.y - minY} ${cp2.x - minX},${cp2.y - minY} ${e.x - minX},${e.y - minY}`;
+                            cp1 = { x: s.x, y: s.y + dir * off };
                         }
+                        if (Math.abs(lastVec.x) >= Math.abs(lastVec.y)) {
+                            const dir = Math.sign(lastVec.x) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
+                            cp2 = { x: e.x - dir * off, y: e.y };
+                        } else {
+                            const dir = Math.sign(lastVec.y) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
+                            cp2 = { x: e.x, y: e.y - dir * off };
+                        }
+                        d = `M ${s.x - minX},${s.y - minY} C ${cp1.x - minX},${cp1.y - minY} ${cp2.x - minX},${cp2.y - minY} ${e.x - minX},${e.y - minY}`;
                     } else {
                         d = buildRoundedPath(p.points, p.r || 0, minX, minY);
                     }
