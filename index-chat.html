@@ -13,17 +13,23 @@
             margin: 0; /* To disappear the scrollbars */
         }
 
-        .movable-plus {
+        .controls-button {
             background-color: #dfdfdf;
             color: #fff;
             border: none;
             border-radius: 5px;
-            padding: 8px ;
+            /* Use flex so button content is centered and buttons can stretch to equal height */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px; /* horizontal padding; vertical size controlled by height */
+            height: 34px; /* fixed equal height for all buttons */
+            box-sizing: border-box;
         }
-        .movable-plus:hover, .movable-plus:focus {
+        .controls-button:hover, .controls-button:focus {
             background-color: #b9b9b9;
         }
-        .movable-plus:active {
+        .controls-button:active {
             background-color: #0078d3;
         }
         .cameraViewContainer {
@@ -36,35 +42,41 @@
         /* .cameraViewContent {
         } */
         .movable {
-            width: 150px;          
-            height: auto;          
+            width: 150px;
+            height: auto;
             /* background: #fff; */
             border-radius: 7px;
             padding: 12px;
             border: 3px solid black;
-            /* position: relative; */ /* Added for the plus button but doesn't seem to be required */
-            /* overflow: visible;  */ /* Added for the plus button but doesn't seem to be required */
+            /* Ensure movables establish a positioning context for absolute controls */
+            position: relative;
+            /* Controls appear outside the movable; allow them to be visible */
+            overflow: visible;
         }
-        .movable-plus {
+
+        .movable-controls {
+            /* Position the controls below the movable, centered */
             position: absolute;
             left: 50%;
             top: 100%;
-            transform: translate(-50%, 6px);
+            transform: translate(-50%, 0px);
             z-index: 10;
-            /* Use opacity and pointer-events so we can delay hiding without smoothing */
             opacity: 0;
-            pointer-events: none;
+            pointer-events: auto;
             margin: 0;
-            /* Hide after a short delay, but do it instantly (no fade) */
-            transition: opacity 0ms linear 200ms;
+            margin-top: 6px;
+            display: inline-flex;
+            gap: 3px;
+            align-items: stretch;
+            transition: opacity 0ms linear 300ms; 
         }
-        /* Show immediately on hover/focus (no delay), enable pointer events */
-        .movable:hover .movable-plus,
-        .movable:focus-within .movable-plus,
-        .movable-plus:focus {
+
+            .movable:hover .movable-controls,
+        .movable:focus-within .movable-controls,
+        .movable-controls:focus {
             opacity: 1;
             pointer-events: auto;
-            transition-delay: 0ms; /* ensure immediate show */
+            transition-delay: 0ms; 
         }
         .arrowOverlay {
             position: absolute;

@@ -149,7 +149,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 const midX = (x0 + x1) / 2;
                 const midY = (y0 + y1) / 2;
                 let newScale = pinchStartScale * (dist / pinchStartDist);
-                newScale = Math.max(0.1, Math.min(newScale, 10));
+                newScale = Math.max(0.01, Math.min(newScale, 100));
                 cameraX = pinchStartMid.x - (midX - rect.left) / newScale;
                 cameraY = pinchStartMid.y - (midY - rect.top) / newScale;
                 scale = newScale;
@@ -185,7 +185,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 // Zoom in/out
                 const zoomIntensity = 0.6;
                 let newScale = scale * (1 - e.deltaY * zoomIntensity / 100);
-                newScale = Math.max(0.1, Math.min(newScale, 10));
+                newScale = Math.max(0.01, Math.min(newScale, 100));
                 // Zoom to mouse position
                 const rect = container.getBoundingClientRect();
                 const mouseX = (e.clientX - rect.left) / scale + cameraX;

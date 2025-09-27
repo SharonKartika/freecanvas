@@ -14,7 +14,7 @@ function drawArrowsForConnections(svg, connections) {
     //  - 'center'    : draw from center-to-center (legacy behavior)
     //  - 'edgeCurve' : orthogonal routed (L-shaped) arrows that can be smoothed
     const ARROW_STYLE = 'edgeCurve';
-    const ORTHOGONAL_SMOOTHNESS = 0.4;
+    const ORTHOGONAL_SMOOTHNESS = 0.1;
     // Precompute centers and sizes for all involved elements to avoid repeated DOM reads
     const allEls = Array.from(new Set(connections.flat()));
     const centerMap = new Map();
