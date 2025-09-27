@@ -94,6 +94,9 @@ function drawArrowsForConnections(svg, connections) {
 
     // EDGE-CURVE style: orthogonal (L-shaped) routed paths with optional smoothing
     if (ARROW_STYLE === 'edgeCurve') {
+        // Minimum leg length in pixels used to avoid tiny legs that produce
+        // visually sharp corners. Tweak to taste.
+        const MIN_LEG = 20;
         const paths = [];
         for (const [fromEl, toEl] of connections) {
             const fromCenter = centerMap.get(fromEl) || getCenter(fromEl);
@@ -130,7 +133,9 @@ function drawArrowsForConnections(svg, connections) {
             const horizontalOverlap = (fromLeft <= toRight && fromRight >= toLeft);
 
             if (verticalOverlap && dx !== 0) {
-                // draw straight horizontal between facing sides
+                // Instead of a single straight horizontal line, route H -> V -> H
+                // so the connection leaves the source horizontally, travels to a
+                // mid x, goes vertically, then finishes horizontally into target.
                 if (fromCenter.x > toCenter.x) {
                     // source is to the right -> connect source.left to target.right
                     start = getEdgeMidpoint(fromCenter, fromEl, 'left');
@@ -140,12 +145,34 @@ function drawArrowsForConnections(svg, connections) {
                     start = getEdgeMidpoint(fromCenter, fromEl, 'right');
                     end = getEdgeMidpoint(toCenter, toEl, 'left');
                 }
-                paths.push({ start, c1: start, c2: end, end, corner: null, r: 0 });
+                // Choose a middle x between start and end so we have two corners.
+                // If the horizontal separation is very small the H legs become
+                // tiny and corners look sharp. To avoid that, push the midX
+                // outside the interval by a minimum leg length so each horizontal
+                // leg is at least MIN_LEG pixels long.
+                const MIN_LEG = 20;
+                const totalX = end.x - start.x;
+                const dirX = Math.sign(totalX) || 1;
+                let midX = start.x + totalX / 2;
+                if (Math.abs(totalX) < 2 * MIN_LEG) {
+                    // push midX beyond the target in the direction of travel
+                    midX = end.x + dirX * MIN_LEG;
+                }
+                const corner1 = { x: midX, y: start.y };
+                const corner2 = { x: midX, y: end.y };
+                // legs lengths for smoothing radius
+                const legA = Math.abs(corner1.x - start.x);
+                const legB = Math.abs(corner2.y - corner1.y);
+                const legC = Math.abs(end.x - corner2.x);
+                const r = ORTHOGONAL_SMOOTHNESS * Math.min(legA, legB, legC);
+                paths.push({ points: [start, corner1, corner2, end], r });
                 continue;
             }
 
             if (horizontalOverlap && dy !== 0) {
-                // draw straight vertical between facing sides
+                // Instead of a single straight vertical line, route V -> H -> V
+                // so the connection leaves the source vertically, travels to a
+                // mid y, goes horizontally, then finishes vertically into target.
                 if (fromCenter.y > toCenter.y) {
                     // source is below -> connect source.top to target.bottom
                     start = getEdgeMidpoint(fromCenter, fromEl, 'top');
@@ -155,7 +182,27 @@ function drawArrowsForConnections(svg, connections) {
                     start = getEdgeMidpoint(fromCenter, fromEl, 'bottom');
                     end = getEdgeMidpoint(toCenter, toEl, 'top');
                 }
-                paths.push({ start, c1: start, c2: end, end, corner: null, r: 0 });
+                // Choose a middle y between start and end so we have two corners.
+                // If the vertical separation is very small the V legs become
+                // tiny and corners look sharp. To avoid that, push the midY
+                // outside the interval by a minimum leg length so each vertical
+                // leg is at least MIN_LEG pixels long.
+                const MIN_LEG = 20;
+                const totalY = end.y - start.y;
+                const dirY = Math.sign(totalY) || 1;
+                let midY = start.y + totalY / 2;
+                if (Math.abs(totalY) < 2 * MIN_LEG) {
+                    // push midY beyond the target in the direction of travel
+                    midY = end.y + dirY * MIN_LEG;
+                }
+                const corner1 = { x: start.x, y: midY };
+                const corner2 = { x: end.x, y: midY };
+                // legs lengths for smoothing radius
+                const legA = Math.abs(corner1.y - start.y);
+                const legB = Math.abs(corner2.x - corner1.x);
+                const legC = Math.abs(end.y - corner2.y);
+                const r = ORTHOGONAL_SMOOTHNESS * Math.min(legA, legB, legC);
+                paths.push({ points: [start, corner1, corner2, end], r });
                 continue;
             }
 
@@ -212,9 +259,44 @@ function drawArrowsForConnections(svg, connections) {
             paths.push({ start, c1, c2, end, corner, r });
         }
 
-        // Collect bounding box including control points
-        const xs = paths.flatMap(p => [p.start.x, p.c1.x, p.c2.x, p.end.x]);
-        const ys = paths.flatMap(p => [p.start.y, p.c1.y, p.c2.y, p.end.y]);
+        // Collect bounding box including control points or polyline points
+        const xs = [];
+        const ys = [];
+        for (const p of paths) {
+            if (p.points && Array.isArray(p.points)) {
+                for (const pt of p.points) { xs.push(pt.x); ys.push(pt.y); }
+                // If this is a 4-point H-V-H or V-H-V and the two middle corners
+                // are very close, we'll render a single cubic. Include the cubic
+                // control points in bbox so they aren't clipped.
+                if (p.points.length === 4) {
+                    const a = p.points[1];
+                    const b = p.points[2];
+                    const midDist = Math.hypot(b.x - a.x, b.y - a.y);
+                    if (midDist < 2 * MIN_LEG) {
+                        // compute cubic control points aligned with start/end direction
+                        const s = p.points[0];
+                        const e = p.points[3];
+                        if (s.x !== e.x) {
+                            const dir = Math.sign(e.x - s.x) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
+                            const cp1 = { x: s.x + dir * off, y: s.y };
+                            const cp2 = { x: e.x - dir * off, y: e.y };
+                            xs.push(cp1.x, cp2.x); ys.push(cp1.y, cp2.y);
+                        } else {
+                            const dir = Math.sign(e.y - s.y) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
+                            const cp1 = { x: s.x, y: s.y + dir * off };
+                            const cp2 = { x: e.x, y: e.y - dir * off };
+                            xs.push(cp1.x, cp2.x); ys.push(cp1.y, cp2.y);
+                        }
+                    }
+                }
+                continue;
+            }
+            // legacy shape
+            xs.push(p.start.x, p.c1.x, p.c2.x, p.end.x);
+            ys.push(p.start.y, p.c1.y, p.c2.y, p.end.y);
+        }
         const minX = Math.min(...xs) - 20;
         const minY = Math.min(...ys) - 20;
         const maxX = Math.max(...xs) + 20;
@@ -228,23 +310,92 @@ function drawArrowsForConnections(svg, connections) {
         svg.setAttribute('width', width);
         svg.setAttribute('height', height);
 
+        // Helper: build rounded polyline path d attribute for an array of points
+        function buildRoundedPath(points, r, minX, minY) {
+            if (!points || points.length === 0) return '';
+            const n = points.length;
+            if (n === 1) return `M ${points[0].x - minX},${points[0].y - minY}`;
+            // No rounding if radius is zero or only two points
+            if (r <= 0 || n === 2) {
+                let d = `M ${points[0].x - minX},${points[0].y - minY}`;
+                for (let i = 1; i < n; i++) d += ` L ${points[i].x - minX},${points[i].y - minY}`;
+                return d;
+            }
+            // Precompute truncated corner points
+            const corners = [];
+            for (let k = 1; k <= n - 2; k++) {
+                const prev = points[k - 1];
+                const curr = points[k];
+                const next = points[k + 1];
+                const v1x = curr.x - prev.x; const v1y = curr.y - prev.y;
+                const v2x = next.x - curr.x; const v2y = next.y - curr.y;
+                const len1 = Math.hypot(v1x, v1y) || 1;
+                const len2 = Math.hypot(v2x, v2y) || 1;
+                const u1x = v1x / len1; const u1y = v1y / len1;
+                const u2x = v2x / len2; const u2y = v2y / len2;
+                const r1 = Math.min(r, len1 / 2);
+                const r2 = Math.min(r, len2 / 2);
+                const p1 = { x: curr.x - u1x * r1, y: curr.y - u1y * r1 };
+                const p2 = { x: curr.x + u2x * r2, y: curr.y + u2y * r2 };
+                const cross = u1x * u2y - u1y * u2x;
+                const sweepFlag = cross > 0 ? 1 : 0;
+                corners.push({ p1, p2, radius: Math.min(r1, r2), sweepFlag });
+            }
+
+            let d = `M ${points[0].x - minX},${points[0].y - minY}`;
+            for (let k = 1; k <= n - 2; k++) {
+                const corner = corners[k - 1];
+                // line to start of arc
+                d += ` L ${corner.p1.x - minX},${corner.p1.y - minY}`;
+                // arc to end of arc
+                d += ` A ${corner.radius},${corner.radius} 0 0 ${corner.sweepFlag} ${corner.p2.x - minX},${corner.p2.y - minY}`;
+            }
+            // line to final point
+            d += ` L ${points[n - 1].x - minX},${points[n - 1].y - minY}`;
+            return d;
+        }
+
         // Draw paths
         for (const p of paths) {
             const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             let d;
-            if (p.corner && p.r === 0) {
+            if (p.points && Array.isArray(p.points)) {
+                // If this is a 4-point H-V-H or V-H-V and the middle segment is
+                // very short, render a single cubic Bezier (S-curve) for a
+                // smoother transition instead of two tiny arcs.
+                if (p.points.length === 4) {
+                    const s = p.points[0];
+                    const a = p.points[1];
+                    const b = p.points[2];
+                    const e = p.points[3];
+                    const midDist = Math.hypot(b.x - a.x, b.y - a.y);
+                    if (midDist < 2 * MIN_LEG) {
+                        // create cubic control points that pull the curve outward
+                        if (s.x !== e.x) {
+                            const dir = Math.sign(e.x - s.x) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.x - s.x) / 2);
+                            const cp1 = { x: s.x + dir * off, y: s.y };
+                            const cp2 = { x: e.x - dir * off, y: e.y };
+                            d = `M ${s.x - minX},${s.y - minY} C ${cp1.x - minX},${cp1.y - minY} ${cp2.x - minX},${cp2.y - minY} ${e.x - minX},${e.y - minY}`;
+                        } else {
+                            const dir = Math.sign(e.y - s.y) || 1;
+                            const off = Math.max(MIN_LEG, Math.abs(e.y - s.y) / 2);
+                            const cp1 = { x: s.x, y: s.y + dir * off };
+                            const cp2 = { x: e.x, y: e.y - dir * off };
+                            d = `M ${s.x - minX},${s.y - minY} C ${cp1.x - minX},${cp1.y - minY} ${cp2.x - minX},${cp2.y - minY} ${e.x - minX},${e.y - minY}`;
+                        }
+                    } else {
+                        d = buildRoundedPath(p.points, p.r || 0, minX, minY);
+                    }
+                } else {
+                    d = buildRoundedPath(p.points, p.r || 0, minX, minY);
+                }
+            } else if (p.corner && p.r === 0) {
                 // Sharp L: two straight segments via the corner
                 d = `M ${p.start.x - minX},${p.start.y - minY} L ${p.corner.x - minX},${p.corner.y - minY} L ${p.end.x - minX},${p.end.y - minY}`;
             } else if (p.corner && p.r > 0) {
-                // Smooth corner: truncate both legs by r and draw a cubic that
-                // approximates a quarter-circle between the two truncated points.
+                // Smooth corner: existing single-corner logic
                 const r = p.r;
-                const k = 0.5522847498307936; // circle approximation constant
-                // Determine if the path is horizontal-first or vertical-first by
-                // comparing positions relative to corner.
-                // Robust approach: derive unit directions for the two legs from the
-                // actual vectors (corner - start) and (end - corner). Because the
-                // legs are axis-aligned this yields unit vectors like (1,0) or (0,1).
                 const v1x = p.corner.x - p.start.x;
                 const v1y = p.corner.y - p.start.y;
                 const v2x = p.end.x - p.corner.x;
@@ -253,22 +404,13 @@ function drawArrowsForConnections(svg, connections) {
                 const u1y = Math.abs(v1y) >= Math.abs(v1x) ? Math.sign(v1y) : 0;
                 const u2x = Math.abs(v2x) > Math.abs(v2y) ? Math.sign(v2x) : 0;
                 const u2y = Math.abs(v2y) >= Math.abs(v2x) ? Math.sign(v2y) : 0;
-
-                // p1 is on the first leg at distance r from corner (backwards along u1)
                 const p1 = { x: p.corner.x - u1x * r, y: p.corner.y - u1y * r };
-                // p2 is on the second leg at distance r from corner (forward along u2)
                 const p2 = { x: p.corner.x + u2x * r, y: p.corner.y + u2y * r };
-                // control points for cubic that approximates a circular arc from p1 -> p2
-                // (we keep them for debugging but will use an exact SVG arc command)
-                const cp1 = { x: p1.x + u2x * k * r, y: p1.y + u2y * k * r };
-                const cp2 = { x: p2.x - u1x * k * r, y: p2.y - u1y * k * r };
-                // Choose sweep flag so the arc goes from the incoming leg to outgoing leg
                 const cross = u1x * u2y - u1y * u2x;
                 const sweepFlag = cross > 0 ? 1 : 0;
-                // debug logging removed
                 d = `M ${p.start.x - minX},${p.start.y - minY} L ${p1.x - minX},${p1.y - minY} A ${r},${r} 0 0 ${sweepFlag} ${p2.x - minX},${p2.y - minY} L ${p.end.x - minX},${p.end.y - minY}`;
             } else {
-                // Simple straight line
+                // Simple straight line (legacy)
                 d = `M ${p.start.x - minX},${p.start.y - minY} L ${p.end.x - minX},${p.end.y - minY}`;
             }
             pathEl.setAttribute('d', d);
