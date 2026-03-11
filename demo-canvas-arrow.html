@@ -61,7 +61,15 @@
                         const edgePairs = connections
                             .map(([from, to]) => [idToEl[from], idToEl[to]])
                             .filter(([from, to]) => from && to);
-                        window.ArrowLib.drawArrowsForConnections(svg, edgePairs);
+                        // Per-connection props (style can be 'center' or 'edge').
+                        // Keep this simple: show a mix of styles for the demo.
+                        const propsList = [
+                            { style: 'edge' },
+                            { style: 'edge' },
+                            { style: 'center' },
+                            { style: 'edge' }
+                        ];
+                        window.ArrowLib.drawArrowsForConnections(svg, edgePairs, propsList);
                     }
                 }
                 drawDemoArrows();
