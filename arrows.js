@@ -41,7 +41,8 @@
 
     // Draw arrows for connections.
     // connections: array of [fromElement, toElement]
-    // propsList: optional array of per-connection options, e.g. { style: 'center'|'edge' }
+    // propsList: optional array of per-connection options, e.g.
+    // { style: 'center'|'edge', route: 'straight'|'orthogonal', smoothness: number }
     function drawArrowsForConnections(svg, connections, propsList) {
         if (!svg) return;
         while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -58,20 +59,48 @@
             const dx = pTo.x - pFrom.x;
             const dy = pTo.y - pFrom.y;
             const props = (Array.isArray(propsList) && propsList[i]) || {};
-            const style = props.style || 'center';
+            const anchorStyle = props.style === 'edge' ? 'edge' : 'center';
+            const route = props.route || 'straight';
+            const smoothness = typeof props.smoothness === 'number' ? props.smoothness : 0.15;
 
-            let start, end;
-            if (style === 'edge') {
-                start = getEdgePoint(pFrom, fromEl, dx, dy);
-                end = getEdgePoint(pTo, toEl, -dx, -dy);
+            // Anchors: center or edge intersection along center-line
+            const anchorStart = anchorStyle === 'edge' ? getEdgePoint(pFrom, fromEl, dx, dy) : pFrom;
+            const anchorEnd = anchorStyle === 'edge' ? getEdgePoint(pTo, toEl, -dx, -dy) : pTo;
+
+            if (route === 'orthogonal') {
+                const horizontalFirst = Math.abs(dx) >= Math.abs(dy);
+                const MIN_LEG = 20;
+                // Build base orthogonal corners from centers
+                function computeBaseCorners(a, b, horiz) {
+                    if (horiz) {
+                        let midX = a.x + (b.x - a.x) / 2;
+                        const totalX = b.x - a.x;
+                        const dirX = Math.sign(totalX) || 1;
+                        if (Math.abs(totalX) < 2 * MIN_LEG) midX = b.x + dirX * MIN_LEG;
+                        return [{ x: a.x, y: a.y }, { x: midX, y: a.y }, { x: midX, y: b.y }, { x: b.x, y: b.y }];
+                    } else {
+                        let midY = a.y + (b.y - a.y) / 2;
+                        const totalY = b.y - a.y;
+                        const dirY = Math.sign(totalY) || 1;
+                        if (Math.abs(totalY) < 2 * MIN_LEG) midY = b.y + dirY * MIN_LEG;
+                        return [{ x: a.x, y: a.y }, { x: a.x, y: midY }, { x: b.x, y: midY }, { x: b.x, y: b.y }];
+                    }
+                }
+
+                const base = computeBaseCorners(pFrom, pTo, horizontalFirst);
+                // clip endpoints to edges only if anchorStyle === 'edge', using
+                // the direction toward the first/last inner corner.
+                const firstInner = base[1];
+                const lastInner = base[base.length - 2];
+                const s = anchorStyle === 'edge' ? getEdgePoint(pFrom, fromEl, firstInner.x - pFrom.x, firstInner.y - pFrom.y) : pFrom;
+                const e = anchorStyle === 'edge' ? getEdgePoint(pTo, toEl, lastInner.x - pTo.x, lastInner.y - pTo.y) : pTo;
+                const points = [s, ...base.slice(1, -1), e];
+                pairs.push({ points, smoothness });
+                pts.push(...points);
             } else {
-                // default: center-to-center
-                start = pFrom;
-                end = pTo;
+                pairs.push({ start: anchorStart, end: anchorEnd });
+                pts.push(anchorStart, anchorEnd);
             }
-
-            pairs.push({ start, end });
-            pts.push(start, end);
         }
         if (pairs.length === 0) return;
 
@@ -91,15 +120,68 @@
         svg.setAttribute('width', width);
         svg.setAttribute('height', height);
 
-        for (const { start, end } of pairs) {
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', start.x - minX);
-            line.setAttribute('y1', start.y - minY);
-            line.setAttribute('x2', end.x - minX);
-            line.setAttribute('y2', end.y - minY);
-            line.setAttribute('stroke', 'black');
-            line.setAttribute('stroke-width', '2');
-            svg.appendChild(line);
+        // Helper: build rounded path for polyline points (supports 2..n points)
+        function buildRoundedPath(points, smoothnessVal, minX, minY) {
+            if (!points || points.length === 0) return '';
+            const n = points.length;
+            if (n === 1) return `M ${points[0].x - minX},${points[0].y - minY}`;
+            // derive a base radius from available leg lengths
+            const legLens = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
+            const base = Math.min(...legLens) || 0;
+            const r = Math.max(0, smoothnessVal) * base;
+            if (r <= 0 || n === 2) {
+                let d = `M ${points[0].x - minX},${points[0].y - minY}`;
+                for (let i = 1; i < n; i++) d += ` L ${points[i].x - minX},${points[i].y - minY}`;
+                return d;
+            }
+            const corners = [];
+            for (let k = 1; k <= n - 2; k++) {
+                const prev = points[k - 1];
+                const curr = points[k];
+                const next = points[k + 1];
+                const v1x = curr.x - prev.x; const v1y = curr.y - prev.y;
+                const v2x = next.x - curr.x; const v2y = next.y - curr.y;
+                const len1 = Math.hypot(v1x, v1y) || 1;
+                const len2 = Math.hypot(v2x, v2y) || 1;
+                const u1x = v1x / len1; const u1y = v1y / len1;
+                const u2x = v2x / len2; const u2y = v2y / len2;
+                const r1 = Math.min(r, len1 / 2);
+                const r2 = Math.min(r, len2 / 2);
+                const p1 = { x: curr.x - u1x * r1, y: curr.y - u1y * r1 };
+                const p2 = { x: curr.x + u2x * r2, y: curr.y + u2y * r2 };
+                const cross = u1x * u2y - u1y * u2x;
+                const sweepFlag = cross > 0 ? 1 : 0;
+                corners.push({ p1, p2, radius: Math.min(r1, r2), sweepFlag });
+            }
+            let d = `M ${points[0].x - minX},${points[0].y - minY}`;
+            for (let k = 1; k <= n - 2; k++) {
+                const corner = corners[k - 1];
+                d += ` L ${corner.p1.x - minX},${corner.p1.y - minY}`;
+                d += ` A ${corner.radius},${corner.radius} 0 0 ${corner.sweepFlag} ${corner.p2.x - minX},${corner.p2.y - minY}`;
+            }
+            d += ` L ${points[n - 1].x - minX},${points[n - 1].y - minY}`;
+            return d;
+        }
+
+        for (const item of pairs) {
+            if (item.points && Array.isArray(item.points)) {
+                const d = buildRoundedPath(item.points, item.smoothness || 0, minX, minY);
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('stroke', 'black');
+                pathEl.setAttribute('stroke-width', '2');
+                pathEl.setAttribute('fill', 'none');
+                svg.appendChild(pathEl);
+            } else if (item.start && item.end) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', item.start.x - minX);
+                line.setAttribute('y1', item.start.y - minY);
+                line.setAttribute('x2', item.end.x - minX);
+                line.setAttribute('y2', item.end.y - minY);
+                line.setAttribute('stroke', 'black');
+                line.setAttribute('stroke-width', '2');
+                svg.appendChild(line);
+            }
         }
     }
 
