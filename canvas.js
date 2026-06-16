@@ -25,9 +25,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
         let startMouse = {x: 0, y: 0};
         let startCamera = {x: 0, y: 0};
 
-    function updateMovablePositions() {
-    // Listen for custom event to update positions during drag
-    container.addEventListener('updateMovablePositions', updateMovablePositions);
+        function updateMovablePositions() {
             const content = container.querySelector('.' + contentClass);
             // Enforce mandatory content styles
             Object.assign(content.style, {
@@ -46,6 +44,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
 
             let maxBottom = 0;
             let maxRight = 0;
+            // TODO: Derive size from each movable instead of fixed 50x50.
             const boxWidth = 50, boxHeight = 50;
             const movables = Array.from(content.querySelectorAll('.' + elementClass));
             movables.forEach(function(el) {
@@ -74,6 +73,8 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 el.style.top = y + 'px';
             });
         }
+        // Listen for custom event to update positions during drag
+        container.addEventListener('updateMovablePositions', updateMovablePositions);
         container.addEventListener('mousedown', function(e) {
             if (e.target.classList.contains(elementClass)) return; // Prevent camera pan if dragging element
             isPanning = true;
@@ -84,6 +85,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
             container.style.cursor = 'grabbing';
         });
 
+        // TODO: Use shared document listeners and track active container to avoid N listeners per container.
         document.addEventListener('mousemove', function(e) {
             if (!isPanning) return;
             const dx = (e.clientX - startMouse.x) / scale;
@@ -154,6 +156,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 cameraY = pinchStartMid.y - (midY - rect.top) / newScale;
                 scale = newScale;
                 updateMovablePositions();
+                // TODO: Dispatch cameraViewChanged here to match mouse/wheel behavior.
                 e.preventDefault();
             } else if (e.touches.length === 1 && isPanning) {
                 // One finger pan
@@ -162,6 +165,7 @@ function enableCameraView(containerClass, contentClass, elementClass) {
                 cameraX = startCamera.x - dx;
                 cameraY = startCamera.y - dy;
                 updateMovablePositions();
+                // TODO: Dispatch cameraViewChanged here to match mouse/wheel behavior.
                 e.preventDefault();
             }
         }, { passive: false });
@@ -226,15 +230,8 @@ let dragState = {
     container: null
 };
 
-function updateDraggedPosition() {
-    if (dragState.el) {
-        dragState.el.style.left = dragState.nextLeft + 'px';
-        dragState.el.style.top = dragState.nextTop + 'px';
-    }
-    dragState.pending = false;
-}
-
 function enableElementDragging(draggableClass) {
+    const disabledClass = 'drag-disabled';
     // Attach document-level listeners only once
     if (enableElementDragging._listenersAttached) return;
     enableElementDragging._listenersAttached = true;
@@ -242,6 +239,7 @@ function enableElementDragging(draggableClass) {
     // Use event delegation for mousedown and touchstart
     document.addEventListener('mousedown', function(e) {
         if (!e.target.classList.contains(draggableClass)) return;
+        if (e.target.classList.contains(disabledClass)) return;
         dragState.el = e.target;
         dragState.isDragging = true;
         dragState.startX = e.clientX;
@@ -258,6 +256,7 @@ function enableElementDragging(draggableClass) {
         if (e.touches.length !== 1) return;
         const target = e.target;
         if (!target.classList.contains(draggableClass)) return;
+        if (target.classList.contains(disabledClass)) return;
         dragState.el = target;
         dragState.isDragging = true;
         dragState.startX = e.touches[0].clientX;

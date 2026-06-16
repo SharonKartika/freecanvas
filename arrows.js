@@ -16,8 +16,9 @@
             svg.classList.add('arrowOverlay');
             svg.style.position = 'absolute';
             svg.style.pointerEvents = 'none';
-            svg.style.zIndex = '10';
-            content.appendChild(svg);
+            // svg.style.zIndex = '0';
+            // Insert as first child so the overlay paints beneath later children
+            content.insertBefore(svg, content.firstChild);
         }
         return svg;
     }
@@ -42,7 +43,7 @@
     // Draw arrows for connections.
     // connections: array of [fromElement, toElement]
     // propsList: optional array of per-connection options, e.g.
-    // { style: 'center'|'edge', route: 'straight'|'orthogonal', smoothness: number }
+    // { style: 'center'|'edge', route: 'straight'|'orthogonal', smoothness: number, strokeWidth: number, stroke: string }
     function drawArrowsForConnections(svg, connections, propsList) {
         if (!svg) return;
         while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -62,6 +63,8 @@
             const anchorStyle = props.style === 'edge' ? 'edge' : 'center';
             const route = props.route || 'straight';
             const smoothness = typeof props.smoothness === 'number' ? props.smoothness : 0.15;
+            const strokeWidth = typeof props.strokeWidth === 'number' ? props.strokeWidth : 2;
+            const stroke = typeof props.stroke === 'string' && props.stroke ? props.stroke : 'black';
 
             // Anchors: center or edge intersection along center-line
             const anchorStart = anchorStyle === 'edge' ? getEdgePoint(pFrom, fromEl, dx, dy) : pFrom;
@@ -95,10 +98,10 @@
                 const s = anchorStyle === 'edge' ? getEdgePoint(pFrom, fromEl, firstInner.x - pFrom.x, firstInner.y - pFrom.y) : pFrom;
                 const e = anchorStyle === 'edge' ? getEdgePoint(pTo, toEl, lastInner.x - pTo.x, lastInner.y - pTo.y) : pTo;
                 const points = [s, ...base.slice(1, -1), e];
-                pairs.push({ points, smoothness });
+                pairs.push({ points, smoothness, strokeWidth, stroke });
                 pts.push(...points);
             } else {
-                pairs.push({ start: anchorStart, end: anchorEnd });
+                pairs.push({ start: anchorStart, end: anchorEnd, strokeWidth, stroke });
                 pts.push(anchorStart, anchorEnd);
             }
         }
@@ -168,8 +171,8 @@
                 const d = buildRoundedPath(item.points, item.smoothness || 0, minX, minY);
                 const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 pathEl.setAttribute('d', d);
-                pathEl.setAttribute('stroke', 'black');
-                pathEl.setAttribute('stroke-width', '2');
+                pathEl.setAttribute('stroke', item.stroke || 'black');
+                pathEl.setAttribute('stroke-width', String(item.strokeWidth || 2));
                 pathEl.setAttribute('fill', 'none');
                 svg.appendChild(pathEl);
             } else if (item.start && item.end) {
@@ -178,11 +181,14 @@
                 line.setAttribute('y1', item.start.y - minY);
                 line.setAttribute('x2', item.end.x - minX);
                 line.setAttribute('y2', item.end.y - minY);
-                line.setAttribute('stroke', 'black');
-                line.setAttribute('stroke-width', '2');
+                line.setAttribute('stroke', item.stroke || 'black');
+                line.setAttribute('stroke-width', String(item.strokeWidth || 2));
                 svg.appendChild(line);
             }
         }
+
+        // TODO: Add optional arrowhead markers (start/end) and expose marker style options.
+        // TODO: Support per-connection CSS class for styling via external stylesheets.
     }
 
     window.ArrowLib = {

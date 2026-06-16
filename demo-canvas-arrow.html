@@ -64,10 +64,10 @@
                         // Per-connection props (style can be 'center' or 'edge').
                         // Keep this simple: show a mix of styles for the demo.
                         const propsList = [
-                            { style: 'edge', route: 'straight' },
-                            { style: 'edge', route: 'orthogonal', smoothness: 0. },
-                            { style: 'center', route: 'orthogonal', smoothness: 0.35 },
-                            { style: 'edge', route: 'straight' }
+                            { style: 'edge', route: 'straight', strokeWidth: 4 },
+                            { style: 'edge', route: 'orthogonal', smoothness: 0., strokeWidth: 1, stroke: '#d44a2b' },
+                            { style: 'center', route: 'orthogonal', smoothness: 0.1, strokeWidth: 6 },
+                            { style: 'edge', route: 'straight', strokeWidth: 2 }
                         ];
                         window.ArrowLib.drawArrowsForConnections(svg, edgePairs, propsList);
                     }
